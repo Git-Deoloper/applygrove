@@ -1,0 +1,11 @@
+{
+  "name":"Applygrove — Your job search, a little lighter",
+  "short_name":"Applygrove",
+  "description":"A calm, private place for every application and next step.",
+  "start_url":"./",
+  "scope":"./",
+  "display":"standalone",
+  "background_color":"#f7f6f0",
+  "theme_color":"#24483d",
+  "icons":[{"src":"assets/icon-192.png","sizes":"192x192","type":"image/png"},{"src":"assets/icon-512.png","sizes":"512x512","type":"image/png"}]
+}

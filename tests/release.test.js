@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile,stat} from 'node:fs/promises';
+import {resolve} from 'node:path';
+const root=resolve(import.meta.dirname,'..');
+const read=path=>readFile(resolve(root,path),'utf8');
+test('site uses Applygrove branding and genuine functionality',async()=>{const s=await read('index.html');assert.match(s,/<title>Applygrove/);assert.match(s,/id="entry-dialog"/);assert.match(s,/id="board"/);assert.match(s,/id="export-json"/);assert.doesNotMatch(s,/PixelLilt|Clariquote|drop.?shrink/i)});
+test('no third-party JavaScript or tracking domains',async()=>{const s=await read('index.html');assert.doesNotMatch(s,/<script[^>]*src="https?:/);assert.doesNotMatch(s,/google-analytics|googletagmanager|hotjar|segment\.io/i)});
+test('strong security headers and no unsafe inline script',async()=>{const s=await read('_headers');assert.match(s,/Content-Security-Policy:/);assert.match(s,/default-src 'none'/);assert.match(s,/frame-ancestors 'none'/);assert.doesNotMatch(s,/unsafe-eval|unsafe-inline/)});
+test('zero production and dev packages',async()=>{const p=JSON.parse(await read('package.json'));assert.deepEqual(p.dependencies,{});assert.deepEqual(p.devDependencies,{})});
+test('original image assets included under size budget',async()=>{for(const file of ['assets/hero.webp','assets/hero-small.webp','assets/social-card.png','assets/icon-512.png'])assert.ok((await stat(resolve(root,file))).size<750_000)});
+test('security-sensitive paths excluded from Git tracking',async()=>{const s=await read('.gitignore');assert.match(s,/\.env/);assert.match(s,/\*\.pem/);assert.match(s,/dist\//)});
+test('docs describe privacy limitation and real export options',async()=>{const s=await read('README.md');assert.match(s,/local storage/i);assert.match(s,/JSON/);assert.match(s,/CSV/);assert.match(s,/not a job board/i)});

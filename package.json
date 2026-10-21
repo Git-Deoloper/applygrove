@@ -1,0 +1,17 @@
+{
+  "name": "applygrove",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A calm, privacy-first, open-source job application tracker",
+  "engines": {"node": ">=22"},
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.js",
+    "verify": "npm run test && npm run build"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "license": "MIT"
+}

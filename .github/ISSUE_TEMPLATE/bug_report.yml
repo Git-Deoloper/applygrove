@@ -1,0 +1,22 @@
+name: Bug report
+description: Report a reproducible defect (never include private application details)
+title: "Bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What went wrong?
+      description: Describe expected and actual behavior using fictional job data.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
