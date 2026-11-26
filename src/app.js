@@ -1,13 +1,16 @@
-import {STAGES,STORAGE_KEY,MAX_ENTRIES,normalizeEntry,validDate,todayISO,dayDifference,isDue,metrics,upcoming,validateImport,makeBackup,makeCSV,makeCalendar,makeFollowup,sampleEntries,newEntryId} from './core.js';
+import {STAGES,STORAGE_KEY,MAX_ENTRIES,MAX_BACKUP_BYTES,restoreWorkspace,normalizeEntry,validDate,todayISO,dayDifference,isDue,metrics,upcoming,validateImport,makeBackup,makeCSV,makeCalendar,makeFollowup,sampleEntries,newEntryId} from './core.js';
 const $=id=>document.getElementById(id);
 const els={board:$('board'),dialog:$('entry-dialog'),form:$('entry-form'),notice:$('sample-notice'),toast:$('toast'),search:$('search'),filter:$('stage-filter'),stats:{total:$('stat-total'),active:$('stat-progress'),interviews:$('stat-interviews'),due:$('stat-due')}};
 let entries=[],demo=false,view='board',dueOnly=false,deleteTarget=null,actionsTarget=null,toastTimer=null;
-try {const raw=localStorage.getItem(STORAGE_KEY);if(raw){const parsed=JSON.parse(raw);entries=validateImport(parsed)}}catch{showToast('Unable to load saved data. Nothing was overwritten.');}
-if(!entries.length && !localStorage.getItem(STORAGE_KEY)) {entries=sampleEntries(); demo=true;}
+const restored=restoreWorkspace(()=>localStorage.getItem(STORAGE_KEY));
+entries=restored.entries;demo=restored.demo;if(restored.error)showToast(restored.error);
 $('year').textContent=new Date().getFullYear();
 function save(){
   try{localStorage.setItem(STORAGE_KEY,makeBackup(entries));return true;}
   catch{showToast('Could not save on this device. Export a backup before leaving.');return false;}
+}
+function finishChange(message, sampleMessage='Sample updated. Not saved.'){
+  const saved=demo||save();render();if(saved)showToast(demo?sampleMessage:message);
 }
 function showToast(message){const el=els.toast;el.textContent=message;el.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('visible'),3800)}
 function showDemo(){
@@ -33,7 +36,7 @@ function card(e,i){
   if(e.nextDate){const tag=el('span',`card-due ${dayDifference(e.nextDate)<0?'overdue':''}`,`${dayDifference(e.nextDate)<0?'Due ':'On '}${formatted(e.nextDate)}`);item.append(tag)}
   const actions=el('div','card-actions');const select=el('select','card-stage-select');select.setAttribute('aria-label',`Stage for ${e.role} at ${e.company}`);
   for(const s of STAGES){const option=el('option','',s.label);option.value=s.id;option.selected=s.id===e.stage;select.append(option)}
-  select.addEventListener('change',()=>{e.stage=select.value;if(!demo)save();render();showToast(demo?'Sample stage updated. Not saved.':'Stage updated.')});
+  select.addEventListener('change',()=>{e.stage=select.value;finishChange('Stage updated.','Sample stage updated. Not saved.')});
   actions.append(select,btn('Edit',`Edit ${e.role}`,()=>beginEditing(e)),btn('⋯',`More actions for ${e.role}`,()=>showActions(e)));
   item.append(actions);item.addEventListener('dragstart',evt=>{evt.dataTransfer.setData('text/plain',e.id);evt.dataTransfer.effectAllowed='move'});return item;
 }
@@ -58,7 +61,7 @@ function render(){
     column.append(content);
     column.addEventListener('dragover',evt=>{evt.preventDefault();column.classList.add('drag-over')});
     column.addEventListener('dragleave',evt=>{if(!column.contains(evt.relatedTarget))column.classList.remove('drag-over')});
-    column.addEventListener('drop',evt=>{evt.preventDefault();column.classList.remove('drag-over');const id=evt.dataTransfer.getData('text/plain');const moved=entries.find(x=>x.id===id);if(moved){moved.stage=stage.id;if(!demo)save();render();showToast(demo?'Sample moved. Not saved.':'Opportunity moved.')}});
+    column.addEventListener('drop',evt=>{evt.preventDefault();column.classList.remove('drag-over');const id=evt.dataTransfer.getData('text/plain');const moved=entries.find(x=>x.id===id);if(moved){moved.stage=stage.id;finishChange('Opportunity moved.','Sample moved. Not saved.')}});
     els.board.append(column);
   }
   $('empty-workspace').hidden=entries.length>0;
@@ -75,9 +78,9 @@ els.form.addEventListener('submit',evt=>{evt.preventDefault();const f=new FormDa
   if(!previous&&entries.length>=MAX_ENTRIES){$('modal-error').textContent='This board has reached its 1,000 opportunity limit.';$('modal-error').hidden=false;return;}
   if(demo&&!previous){demo=false;entries=[];}
   if(previous){const i=entries.findIndex(e=>e.id===id);if(i!==-1)entries[i]=normalized;else entries.unshift(normalized)}else entries.unshift(normalized);
-  if(!demo)save();els.dialog.close();render();showToast(demo?'Sample edited; not saved.':previous?'Opportunity updated.':'New opportunity added.');
+  els.dialog.close();finishChange(previous?'Opportunity updated.':'New opportunity added.','Sample edited; not saved.');
 });
-$('cancel-delete').addEventListener('click',()=>$('confirm-dialog').close());$('confirm-delete').addEventListener('click',()=>{if(deleteTarget){entries=entries.filter(e=>e.id!==deleteTarget.id);if(!demo)save();render();showToast('Opportunity removed.');deleteTarget=null}$('confirm-dialog').close()});
+$('cancel-delete').addEventListener('click',()=>$('confirm-dialog').close());$('confirm-delete').addEventListener('click',()=>{if(deleteTarget){entries=entries.filter(e=>e.id!==deleteTarget.id);finishChange('Opportunity removed.','Sample removed. Not saved.');deleteTarget=null}$('confirm-dialog').close()});
 $('show-demo').addEventListener('click',showDemo);$('empty-demo').addEventListener('click',showDemo);$('clear-sample').addEventListener('click',clearDemo);
 $('search').addEventListener('input',render);$('stage-filter').addEventListener('change',render);
 $('view-board').addEventListener('click',()=>setView('board'));$('view-list').addEventListener('click',()=>setView('list'));
@@ -88,10 +91,10 @@ $('export-csv').addEventListener('click',()=>download('applygrove-applications.c
 $('export-calendar').addEventListener('click',()=>{const dated=entries.filter(e=>validDate(e.nextDate)&&!['closed','offer'].includes(e.stage));if(!dated.length){showToast('Add a follow-up date first.');return;}download('applygrove-reminders.ics',makeCalendar(entries),'text/calendar;charset=utf-8')});
 $('import-json').addEventListener('click',()=>$('import-file').click());
 $('import-file').addEventListener('change',async evt=>{const file=evt.target.files?.[0];evt.target.value='';if(!file)return;
-  if(file.size>2*1024*1024){showToast('Backup too large (2 MB maximum).');return}
+  if(file.size>MAX_BACKUP_BYTES){showToast('Backup too large (20 MB maximum).');return}
   let imported;try{imported=validateImport(JSON.parse(await file.text()))}catch(err){showToast(err.message||'Invalid backup.');return}
   if(!confirm(`Replace this workspace with ${imported.length} opportunities from the backup?`))return;
-  entries=imported;demo=false;save();els.search.value='';els.filter.value='all';dueOnly=false;render();showToast('Backup imported.');
+  entries=imported;demo=false;els.search.value='';els.filter.value='all';dueOnly=false;finishChange('Backup imported.');
 });
 if('serviceWorker'in navigator&&location.protocol==='https:'){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}))}
 render();

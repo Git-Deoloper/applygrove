@@ -11,7 +11,7 @@
   [Get started](#run-locally) · [Features](#features) · [Deploy](docs/DEPLOYMENT.md) · [Contribute](CONTRIBUTING.md)
 </div>
 
-![Applygrove: a calm place for your job search](assets/social-card.png)
+![Applygrove: a calm place for your job search](assets/landing-preview.png)
 
 ## A little less to carry
 
@@ -26,6 +26,7 @@ Keep saved roles, applications, interviews, offers, and follow-ups in one browse
 - **Calendar file:** Export follow-ups as `.ics` to import into your preferred calendar app. It does not schedule notifications automatically.
 - **Follow-up writing helper:** Copy a plain, editable message draft for any opportunity. Nothing is sent on your behalf.
 - **Portable data:** Export JSON backup or spreadsheet-compatible CSV; import JSON backups with schema validation and a clear replace confirmation.
+- **Backup limits:** up to 1,000 opportunities and 20 MB per JSON import, including backups with long multilingual notes.
 - **Offline-capable:** After an initial HTTPS visit, its lightweight PWA shell can load without a network connection.
 - **Privacy first:** No server database, telemetry, external scripts, account, or third-party fonts. Information is saved to your browser's local storage.
 - **Accessible and responsive:** Mobile-friendly and keyboard-usable controls, reduced-motion support, visible focus states and semantic form fields.
