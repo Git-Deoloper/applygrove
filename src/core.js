@@ -3,6 +3,8 @@ export const STAGES = Object.freeze([
   {id:'interview',label:'Interview'}, {id:'offer',label:'Offer'}, {id:'closed',label:'Closed'}
 ]);
 export const MAX_ENTRIES = 1000;
+// Covers a fully populated 1,000-entry backup, including multi-byte text.
+export const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
 export const STORAGE_KEY = 'applygrove.entries.v1';
 const MAX_LENGTH = Object.freeze({id:90,company:90,role:110,stage:16,nextDate:10,url:1000,nextAction:180,notes:4000});
 
@@ -58,6 +60,15 @@ export function validateImport(value) {
   return entries;
 }
 export function makeBackup(entries){return JSON.stringify({format:'applygrove-v1',exportedAt:new Date().toISOString(),entries},null,2);}
+export function restoreWorkspace(readStored) {
+  try {
+    const raw = readStored();
+    return raw ? {entries:validateImport(JSON.parse(raw)),demo:false,error:null}
+      : {entries:sampleEntries(),demo:true,error:null};
+  } catch {
+    return {entries:[],demo:false,error:'Unable to load saved data. Nothing was overwritten. You can work in this tab and export a backup.'};
+  }
+}
 function csvCell(value) {
   let v=String(value??'').replace(/\u0000/g,'');
   if(/^[\s\uFEFF]*[=+@\-\t\r]/.test(v)) v="'"+v;
@@ -69,7 +80,7 @@ export function makeCSV(entries){
   for(const e of entries)lines.push([e.company,e.role,e.stage,e.nextDate,e.nextAction,e.url,e.notes,e.createdAt].map(csvCell).join(','));
   return '\ufeff'+lines.join('\r\n')+'\r\n';
 }
-function escapeICal(s){return String(s||'').replace(/\\/g,'\\\\').replace(/\r?\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');}
+function escapeICal(s){return String(s||'').replace(/\\/g,'\\\\').replace(/\r\n|\r|\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');}
 function icalDate(s){return s.replaceAll('-','');}
 function addOneDay(s){const d=new Date(`${s}T00:00:00Z`);d.setUTCDate(d.getUTCDate()+1);return d.toISOString().slice(0,10);}
 function foldICal(value){

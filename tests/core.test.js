@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {STAGES,MAX_ENTRIES,normalizeEntry,safeUrl,validDate,text,dayDifference,isDue,metrics,upcoming,makeBackup,validateImport,makeCSV,makeCalendar,makeFollowup,sampleEntries,newEntryId} from '../src/core.js';
+import {STAGES,MAX_ENTRIES,MAX_BACKUP_BYTES,restoreWorkspace,normalizeEntry,safeUrl,validDate,text,dayDifference,isDue,metrics,upcoming,makeBackup,validateImport,makeCSV,makeCalendar,makeFollowup,sampleEntries,newEntryId} from '../src/core.js';
 const entry=(changes={})=>({id:'test_1',company:'Fern Studio',role:'Designer',stage:'applied',nextDate:'2026-10-24',nextAction:'Send update',url:'https://example.org/job',notes:'Ready',createdAt:'2026-10-20',...changes});
 test('five job stages are supported',()=>assert.deepEqual(STAGES.map(x=>x.id),['saved','applied','interview','offer','closed']));
 test('text sanitizer trims and removes control characters',()=>assert.equal(text('  Hi\u0000 there  ',40),'Hi there'));
@@ -10,6 +10,24 @@ test('safeUrl forbids javascript and data URI',()=>{assert.equal(safeUrl('javasc
 test('safeUrl forbids embedded credentials',()=>assert.equal(safeUrl('https://u:secret@localhost/'),'') );
 test('safeUrl rejects invalid links',()=>assert.equal(safeUrl('not-a-link'),''));
 test('validDate handles leap years and invalid dates',()=>{assert.equal(validDate('2024-02-29'),true);assert.equal(validDate('2025-02-29'),false);assert.equal(validDate('2026-13-01'),false)});
+test('denied browser storage leaves a usable empty workspace with a warning',()=>{
+  let calls=0;const state=restoreWorkspace(()=>{calls++;throw new Error('Access denied')});
+  assert.deepEqual(state.entries,[]);assert.equal(state.demo,false);assert.match(state.error,/Nothing was overwritten/);assert.equal(calls,1);
+});
+test('restoring an intentionally empty saved board does not replace it with samples',()=>{
+  const state=restoreWorkspace(()=>makeBackup([]));assert.equal(state.demo,false);assert.deepEqual(state.entries,[]);assert.equal(state.error,null);
+});
+test('a full Unicode backup fits the same import byte limit and round-trips',()=>{
+  const entries=Array.from({length:MAX_ENTRIES},(_,i)=>normalizeEntry(entry({id:`full_${i}`,company:'名'.repeat(90),role:'職'.repeat(110),nextAction:'約'.repeat(180),notes:'記'.repeat(4000)})));
+  const backup=makeBackup(entries);assert.ok(Buffer.byteLength(backup)<MAX_BACKUP_BYTES);
+  assert.deepEqual(validateImport(JSON.parse(backup)),entries);
+});
+test('calendar text cannot create new properties using bare carriage returns',()=>{
+  const calendar=makeCalendar([entry({nextAction:'Follow up\rBEGIN:VEVENT'})]);
+  assert.ok(calendar.includes('SUMMARY:Follow up\\nBEGIN:VEVENT'));
+  assert.equal(calendar.split('BEGIN:VEVENT').length-1,2);
+  assert.doesNotMatch(calendar,/(?<!\n)\r(?!\n)/);
+});
 test('normalizeEntry validates required fields',()=>assert.throws(()=>normalizeEntry(entry({company:''})),/company and a role/));
 test('normalizeEntry normalizes valid input',()=>assert.deepEqual(normalizeEntry(entry()),entry()));
 test('normalizeEntry caps notes without data mutation',()=>{const e=normalizeEntry(entry({notes:'a'.repeat(4500)}));assert.equal(e.notes.length,4000)});
